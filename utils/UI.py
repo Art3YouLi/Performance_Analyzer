@@ -24,7 +24,7 @@ class PerformanceAnalyzerApp:
         self.status_label = None
         self.chart_tabs = None
         self.root = ttk.Window(
-            title="性能分析工具",
+            title="性能分析工具 - 多文件对比版",
             themename="journal",
             size=(1400, 900),
             minsize=(1200, 700)
@@ -41,6 +41,8 @@ class PerformanceAnalyzerApp:
         # 当前数据
         self.current_data = []
         self.metrics = {}
+        self.file_datasets = {}  # 存储每个文件的数据 {filename: data}
+        self.file_metrics = {}  # 存储每个文件的指标 {filename: metrics}
 
         self.setup_ui()
 
@@ -90,7 +92,7 @@ class PerformanceAnalyzerApp:
         # 标题 - 设置透明背景
         title_label = ttk.Label(
             header_frame,
-            text="📊 性能数据分析工具",
+            text="性能数据分析工具 - 多文件对比版",
             font=(FONT_CONFIG['family'], 18, 'bold'),
             foreground=FEISHU_COLORS['text_primary'],
             background=''  # 设置为透明背景
@@ -111,7 +113,7 @@ class PerformanceAnalyzerApp:
         """创建数据加载模块"""
         loading_frame = ttk.Labelframe(
             parent,
-            text="📁 数据加载",
+            text="数据加载 (支持多文件对比)",
             bootstyle=INFO,
             padding=15
         )
@@ -142,7 +144,7 @@ class PerformanceAnalyzerApp:
 
         self.load_btn = ttk.Button(
             button_frame,
-            text="📂 加载数据文件",
+            text="加载数据文件 (多选)",
             command=self.load_file,
             bootstyle=PRIMARY,
             width=20
@@ -151,18 +153,37 @@ class PerformanceAnalyzerApp:
 
         self.analyze_btn = ttk.Button(
             button_frame,
-            text="🔍 分析数据",
+            text="分析数据",
             command=self.analyze_data,
             bootstyle=SUCCESS,
             width=20
         )
-        self.analyze_btn.pack(side=LEFT)
+        self.analyze_btn.pack(side=LEFT, padx=(0, 10))
+
+        # 添加清除按钮
+        clear_btn = ttk.Button(
+            button_frame,
+            text="清除数据",
+            command=self.clear_data,
+            bootstyle=DANGER,
+            width=15
+        )
+        clear_btn.pack(side=LEFT)
+
+        # 添加文件列表显示
+        self.file_list_label = ttk.Label(
+            loading_frame,
+            text="已加载文件: 无",
+            font=(FONT_CONFIG['family'], 9),
+            foreground=FEISHU_COLORS['text_secondary']
+        )
+        self.file_list_label.grid(row=2, column=0, columnspan=2, sticky='w', pady=(10, 0))
 
     def create_analysis_module(self, parent):
         """创建分析结果模块"""
         analysis_frame = ttk.Labelframe(
             parent,
-            text="📋 分析结果",
+            text="分析结果",
             bootstyle=INFO,
             padding=15
         )
@@ -170,32 +191,49 @@ class PerformanceAnalyzerApp:
         analysis_frame.columnconfigure(0, weight=1)
         analysis_frame.rowconfigure(0, weight=1)
 
-        # 结果文本框
+        # 创建文本框和滚动条
+        text_frame = ttk.Frame(analysis_frame)
+        text_frame.grid(row=0, column=0, sticky='nsew')
+        text_frame.columnconfigure(0, weight=1)
+        text_frame.rowconfigure(0, weight=1)
+
         self.result_text = ttk.Text(
-            analysis_frame,
-            font=(FONT_CONFIG['family'], FONT_CONFIG['text_size']),
-            wrap=WORD
+            text_frame,
+            font=("Courier New", FONT_CONFIG['text_size']),
+            wrap=NONE
         )
 
-        result_scrollbar = ttk.Scrollbar(
-            analysis_frame,
+        # 水平和垂直滚动条
+        v_scrollbar = ttk.Scrollbar(
+            text_frame,
             orient=VERTICAL,
             command=self.result_text.yview
         )
-        self.result_text.configure(yscrollcommand=result_scrollbar.set)
+        h_scrollbar = ttk.Scrollbar(
+            text_frame,
+            orient=HORIZONTAL,
+            command=self.result_text.xview
+        )
+
+        self.result_text.configure(
+            yscrollcommand=v_scrollbar.set,
+            xscrollcommand=h_scrollbar.set
+        )
 
         self.result_text.grid(row=0, column=0, sticky='nsew')
-        result_scrollbar.grid(row=0, column=1, sticky='ns')
+        v_scrollbar.grid(row=0, column=1, sticky='ns')
+        h_scrollbar.grid(row=1, column=0, sticky='ew')
 
         # 初始显示提示信息
-        self.result_text.insert(1.0, "请先加载数据文件，然后点击'分析数据'按钮")
+        self.result_text.insert(1.0,
+                                "请先加载数据文件，然后点击'分析数据'按钮\n\n支持多文件对比分析，可同时选择多个文件进行加载。")
         self.result_text.config(state=DISABLED)
 
     def create_charts_module(self, parent):
         """创建可视化图表模块"""
         charts_frame = ttk.Labelframe(
             parent,
-            text="📊 可视化图表",
+            text="可视化图表",
             bootstyle=INFO,
             padding=15
         )
@@ -218,40 +256,88 @@ class PerformanceAnalyzerApp:
             tab.rowconfigure(0, weight=1)
 
     def load_file(self):
-        """加载数据文件"""
+        """加载数据文件 - 支持多文件选择"""
         # 确保窗口更新，避免对话框被遮挡
         self.root.update()
 
-        filename = fd.askopenfilename(
+        filenames = fd.askopenfilenames(
             parent=self.root,
-            title="选择数据文件",
-            filetypes=[("文本文件", "*.txt"), ("所有文件", "*.*")]
+            title="选择数据文件 (可多选)",
+            filetypes=[("文本文件", "*.txt"), ("Excel文件", "*.xlsx *.xls"), ("所有文件", "*.*")]
         )
 
-        if filename:
-            self.file_path.set(filename)
-            try:
-                # 加载数据文件
-                self.current_data = self.data_loader.load_data_file(filename, "通用数据")
+        if filenames:
+            self.file_datasets = {}  # 清空之前的数据
+            all_data = []
+
+            for filename in filenames:
+                try:
+                    # 根据文件扩展名选择解析方法
+                    if filename.endswith(('.xlsx', '.xls')):
+                        data = self.data_loader.load_excel_file(filename)
+                    else:
+                        data = self.data_loader.load_data_file(filename, "通用数据")
+
+                    if data:  # 确保文件包含有效数据
+                        self.file_datasets[filename] = data
+                        all_data.extend(data)
+                    else:
+                        messagebox.showwarning("警告", f"文件 {filename} 未包含有效数据")
+
+                except Exception as e:
+                    messagebox.showerror("错误", f"读取文件 {filename} 时出错: {str(e)}")
+                    return
+
+            if self.file_datasets:  # 确保至少有一个文件成功加载
+                self.current_data = all_data
+                file_count = len(self.file_datasets)
+                total_points = len(all_data)
+
+                self.file_path.set(f"已加载 {file_count} 个文件，共 {total_points} 个数据点")
+
+                # 更新文件列表显示
+                file_names = [f.split('/')[-1] for f in self.file_datasets.keys()]
+                self.file_list_label.config(text=f"已加载文件: {', '.join(file_names)}")
 
                 self.status_label.config(
-                    text=f"● 已加载 {len(self.current_data)} 个数据点",
+                    text=f"● 已加载 {file_count} 个文件，共 {total_points} 个数据点",
                     foreground=FEISHU_COLORS['success']
                 )
 
                 # 自动分析数据
                 self.analyze_data()
+            else:
+                messagebox.showwarning("警告", "没有成功加载任何有效数据文件")
 
-            except Exception as e:
-                self.status_label.config(
-                    text="● 加载失败",
-                    foreground=FEISHU_COLORS['danger']
-                )
-                messagebox.showerror("错误", f"读取文件时出错: {str(e)}")
+    def clear_data(self):
+        """清除所有数据"""
+        self.file_datasets = {}
+        self.file_metrics = {}
+        self.current_data = []
+        self.metrics = {}
+
+        self.file_path.set("")
+        self.file_list_label.config(text="已加载文件: 无")
+
+        # 清除结果文本框
+        self.result_text.config(state=NORMAL)
+        self.result_text.delete(1.0, END)
+        self.result_text.insert(1.0, "数据已清除，请加载新的数据文件。")
+        self.result_text.config(state=DISABLED)
+
+        # 清除图表
+        for chart_type in self.chart_tabs:
+            for widget in self.chart_tabs[chart_type].winfo_children():
+                widget.destroy()
+
+        self.status_label.config(
+            text="● 数据已清除",
+            foreground=FEISHU_COLORS['info']
+        )
 
     def analyze_data(self):
-        """分析数据并显示结果"""
-        if not self.current_data:
+        """分析数据并显示结果 - 支持多文件对比"""
+        if not self.file_datasets:
             self.status_label.config(
                 text="● 无数据可分析",
                 foreground=FEISHU_COLORS['warning']
@@ -267,8 +353,17 @@ class PerformanceAnalyzerApp:
             foreground=FEISHU_COLORS['primary']
         )
 
-        # 计算指标
-        self.metrics = self.analyzer.calculate_performance_metrics(self.current_data)
+        # 计算每个文件的指标
+        self.file_metrics = {}
+        for filename, data in self.file_datasets.items():
+            self.file_metrics[filename] = self.analyzer.calculate_performance_metrics(data)
+
+        # 计算合并数据的指标（用于整体分析）
+        all_data = []
+        for data in self.file_datasets.values():
+            all_data.extend(data)
+        self.current_data = all_data
+        self.metrics = self.analyzer.calculate_performance_metrics(all_data)
 
         # 显示结果
         self.display_results()
@@ -282,24 +377,97 @@ class PerformanceAnalyzerApp:
         )
 
     def display_results(self):
-        """显示分析结果"""
-        report = self.analyzer.generate_analysis_report(self.metrics)
+        """显示分析结果 - 支持多文件对比"""
+        if len(self.file_datasets) > 1:
+            # 多文件对比模式
+            report = self.generate_comparison_report()
+        else:
+            # 单文件模式
+            filename = list(self.file_datasets.keys())[0]
+            report = self.analyzer.generate_analysis_report(
+                self.file_metrics[filename],
+                filename
+            )
 
         self.result_text.config(state=NORMAL)
         self.result_text.delete(1.0, END)
         self.result_text.insert(1.0, report)
         self.result_text.config(state=DISABLED)
 
+    def generate_comparison_report(self):
+        """生成多文件对比报告 - 只显示每个文件的详细分析"""
+        report = "=" * 70 + "\n"
+        report += "                   多文件性能分析报告\n"
+        report += "=" * 70 + "\n\n"
+
+        # 文件基本信息
+        report += "文件概览:\n"
+        report += "-" * 50 + "\n"
+        total_points = 0
+        has_insufficient_data = False
+
+        for i, (filename, metrics) in enumerate(self.file_metrics.items(), 1):
+            short_name = filename.split('/')[-1]
+            count = metrics['count']
+            total_points += count
+
+            # 检查数据质量
+            data_quality = metrics.get('data_quality', '未知')
+
+            # 标记数据量不足的文件
+            if metrics.get('insufficient_data', False) or count < 30:
+                report += f"  {i:2d}. {short_name:<25} {count:>6} 个  {data_quality} [警告]\n"
+                has_insufficient_data = True
+            else:
+                report += f"  {i:2d}. {short_name:<25} {count:>6} 个  {data_quality}\n"
+
+        report += f"\n总计: {len(self.file_metrics)} 个文件, {total_points} 个数据点\n"
+
+        # 数据质量统计
+        quality_counts = {}
+        for metrics in self.file_metrics.values():
+            quality = metrics.get('data_quality', '未知')
+            quality_counts[quality] = quality_counts.get(quality, 0) + 1
+
+        if quality_counts:
+            report += "数据质量分布:\n"
+            for quality, count in quality_counts.items():
+                symbol = {
+                    '优秀': '[优秀]',
+                    '良好': '[良好]',
+                    '一般': '[一般]',
+                    '不足': '[不足]',
+                    '严重不足': '[严重不足]'
+                }.get(quality, '[未知]')
+                report += f"  {symbol} {quality}: {count} 个文件\n"
+
+        # 如果有数据量不足的文件，添加说明
+        if has_insufficient_data:
+            report += "\n注：标记[警告]的文件数据量不足，分析结果可能不准确\n"
+
+        report += "\n"
+
+        # 每个文件的详细分析
+        for i, (filename, metrics) in enumerate(self.file_metrics.items(), 1):
+            short_name = filename.split('/')[-1]
+            report += "\n" + "=" * 70 + "\n"
+            report += f"                   文件 {i}: {short_name}\n"
+            report += "=" * 70 + "\n"
+            report += self.analyzer.generate_analysis_report(metrics, short_name)
+
+        return report
+
     def plot_charts(self):
         """绘制所有图表"""
         for chart_type in CHART_TYPES:
             if chart_type in self.chart_tabs:
                 if chart_type == "折线图":
-                    self.chart_renderer.plot_line_chart(self.current_data, self.chart_tabs[chart_type])
+                    self.chart_renderer.plot_line_chart(self.file_datasets, self.chart_tabs[chart_type])
                 elif chart_type == "直方图":
-                    self.chart_renderer.plot_histogram(self.current_data, self.metrics, self.chart_tabs[chart_type])
+                    self.chart_renderer.plot_histogram(self.file_datasets, self.file_metrics,
+                                                       self.chart_tabs[chart_type])
                 elif chart_type == "箱线图":
-                    self.chart_renderer.plot_boxplot(self.current_data, self.metrics, self.chart_tabs[chart_type])
+                    self.chart_renderer.plot_boxplot(self.file_datasets, self.file_metrics, self.chart_tabs[chart_type])
 
     def run(self):
         """运行应用"""

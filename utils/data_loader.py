@@ -122,3 +122,23 @@ class DataLoader:
     def has_data(self, data_type: str) -> bool:
         """检查是否有数据"""
         return len(self.get_data(data_type)) > 0
+
+    def load_excel_file(self, filename: str) -> List[float]:
+        """加载Excel文件数据"""
+        try:
+            import pandas as pd
+
+            # 读取Excel文件
+            df = pd.read_excel(filename)
+
+            # 提取数值数据
+            data = []
+            for column in df.columns:
+                col_data = pd.to_numeric(df[column], errors='coerce').dropna()
+                data.extend(col_data.tolist())
+
+            return data
+        except ImportError:
+            raise Exception("缺少pandas库，请安装: pip install pandas")
+        except Exception as e:
+            raise Exception(f"读取Excel文件时出错: {str(e)}")

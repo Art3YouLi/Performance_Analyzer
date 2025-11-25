@@ -5,6 +5,13 @@
 
 import matplotlib.pyplot as plt
 
+PROJECT_INFO = {
+    'name': '性能分析工具',
+    'version': '1.0.0',
+    'description': '多文件性能数据分析工具'
+}
+
+
 # 设置中文字体和图表样式 - 优化字体回退机制
 plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'Arial', 'DejaVu Sans']
 plt.rcParams['axes.unicode_minus'] = False

@@ -10,7 +10,7 @@ import tkinter.messagebox as messagebox
 from utils.data_loader import DataLoader
 from utils.analyzer import PerformanceAnalyzer
 from utils.charts import ChartRenderer
-from utils.config import FEISHU_COLORS, FONT_CONFIG, CHART_TYPES
+from utils.config import FEISHU_COLORS, FONT_CONFIG, CHART_TYPES, PROJECT_INFO
 
 
 class PerformanceAnalyzerApp:
@@ -24,7 +24,7 @@ class PerformanceAnalyzerApp:
         self.status_label = None
         self.chart_tabs = None
         self.root = ttk.Window(
-            title="性能分析工具 - 多文件对比版",
+            title="性能分析工具 - " + PROJECT_INFO.get('version'),
             themename="journal",
             size=(1400, 900),
             minsize=(1200, 700)
@@ -92,7 +92,7 @@ class PerformanceAnalyzerApp:
         # 标题 - 设置透明背景
         title_label = ttk.Label(
             header_frame,
-            text="性能数据分析工具 - 多文件对比版",
+            text="性能数据分析工具",
             font=(FONT_CONFIG['family'], 18, 'bold'),
             foreground=FEISHU_COLORS['text_primary'],
             background=''  # 设置为透明背景
@@ -144,7 +144,7 @@ class PerformanceAnalyzerApp:
 
         self.load_btn = ttk.Button(
             button_frame,
-            text="加载数据文件 (多选)",
+            text="加载数据",
             command=self.load_file,
             bootstyle=PRIMARY,
             width=20

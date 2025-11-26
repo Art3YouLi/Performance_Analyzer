@@ -395,65 +395,75 @@ class PerformanceAnalyzerApp:
         self.result_text.config(state=DISABLED)
 
     def generate_comparison_report(self):
-        """生成多文件对比报告 - 只显示每个文件的详细分析"""
+        """生成多文件对比报告 - 纯文字简洁版本"""
         report = "=" * 70 + "\n"
-        report += "                   多文件性能分析报告\n"
+        report += f"{'多文件性能分析报告':^70}\n"
         report += "=" * 70 + "\n\n"
 
-        # 文件基本信息
-        report += "文件概览:\n"
+        # 文件概览
+        report += "文件概览\n"
         report += "-" * 50 + "\n"
+
         total_points = 0
-        has_insufficient_data = False
+        file_summary = []
+        quality_counts = {}
 
         for i, (filename, metrics) in enumerate(self.file_metrics.items(), 1):
             short_name = filename.split('/')[-1]
             count = metrics['count']
             total_points += count
-
-            # 检查数据质量
             data_quality = metrics.get('data_quality', '未知')
 
-            # 标记数据量不足的文件
-            if metrics.get('insufficient_data', False) or count < 30:
-                report += f"  {i:2d}. {short_name:<25} {count:>6} 个  {data_quality} [警告]\n"
-                has_insufficient_data = True
-            else:
-                report += f"  {i:2d}. {short_name:<25} {count:>6} 个  {data_quality}\n"
+            # 统计质量分布
+            quality_counts[data_quality] = quality_counts.get(data_quality, 0) + 1
 
-        report += f"\n总计: {len(self.file_metrics)} 个文件, {total_points} 个数据点\n"
+            # 标记警告状态
+            warning_flag = "[警告]" if metrics.get('insufficient_data', False) or count < 30 else ""
 
-        # 数据质量统计
-        quality_counts = {}
-        for metrics in self.file_metrics.values():
-            quality = metrics.get('data_quality', '未知')
-            quality_counts[quality] = quality_counts.get(quality, 0) + 1
+            file_summary.append({
+                'index': i,
+                'name': short_name,
+                'count': count,
+                'quality': data_quality,
+                'warning': warning_flag
+            })
 
+        # 显示文件列表
+        for file_info in file_summary:
+            report += f"{file_info['index']:2d}. {file_info['name']:<20} "
+            report += f"{file_info['count']:>5}个 {file_info['quality']:<6} {file_info['warning']}\n"
+
+        # 汇总信息
+        report += f"\n总计: {len(self.file_metrics)} 个文件, {total_points} 个数据点\n\n"
+
+        # 数据质量统计 - 水平显示
         if quality_counts:
-            report += "数据质量分布:\n"
+            report += "数据质量分布: "
+            quality_items = []
             for quality, count in quality_counts.items():
-                symbol = {
-                    '优秀': '[优秀]',
-                    '良好': '[良好]',
-                    '一般': '[一般]',
-                    '不足': '[不足]',
-                    '严重不足': '[严重不足]'
-                }.get(quality, '[未知]')
-                report += f"  {symbol} {quality}: {count} 个文件\n"
+                quality_items.append(f"{quality}({count})")
+            report += " | ".join(quality_items) + "\n"
 
-        # 如果有数据量不足的文件，添加说明
-        if has_insufficient_data:
-            report += "\n注：标记[警告]的文件数据量不足，分析结果可能不准确\n"
+        # 警告说明
+        if any(file['warning'] for file in file_summary):
+            report += "\n注: 标记[警告]的文件数据量不足，分析结果可能不准确\n"
 
-        report += "\n"
+        report += "\n" + "-" * 70 + "\n\n"
 
         # 每个文件的详细分析
         for i, (filename, metrics) in enumerate(self.file_metrics.items(), 1):
             short_name = filename.split('/')[-1]
-            report += "\n" + "=" * 70 + "\n"
-            report += f"                   文件 {i}: {short_name}\n"
+
+            # 文件分隔标题
             report += "=" * 70 + "\n"
+            report += f" 文件 {i}: {short_name}\n"
+            report += "=" * 70 + "\n"
+
             report += self.analyzer.generate_analysis_report(metrics, short_name)
+
+            # 如果不是最后一个文件，添加分隔空行
+            if i < len(self.file_metrics):
+                report += "\n" + "-" * 70 + "\n\n"
 
         return report
 

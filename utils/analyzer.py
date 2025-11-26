@@ -73,7 +73,7 @@ class PerformanceAnalyzer:
         return metrics
 
     def _calculate_sigma_levels(self, data: List[float], mean: float, std: float) -> Dict[str, float]:
-        """计算西格玛水平 - 包括2sigma、3sigma和6sigma"""
+        """计算西格玛水平"""
         sigma_levels = {}
 
         if std == 0:
@@ -89,15 +89,11 @@ class PerformanceAnalyzer:
                 'within_6sigma': 100.0,
             }
 
-        # 2西格玛范围 (95.45%)
+        # 西格玛范围计算
         sigma_2_lower = mean - 2 * std
         sigma_2_upper = mean + 2 * std
-
-        # 3西格玛范围 (99.73%)
         sigma_3_lower = mean - 3 * std
         sigma_3_upper = mean + 3 * std
-
-        # 6西格玛范围 (99.99966%)
         sigma_6_lower = mean - 6 * std
         sigma_6_upper = mean + 6 * std
 
@@ -144,23 +140,21 @@ class PerformanceAnalyzer:
         strict_percentile_lower = p1
         strict_percentile_upper = p99
 
-        # 推荐的综合区间 - 结合两种方法
+        # 推荐的综合区间
         if metrics.get('within_3sigma', 0) > 99:
-            # 数据分布接近正态，使用2sigma区间
             recommended_lower = sigma_2_lower
             recommended_upper = sigma_2_upper
-            interval_method = "2 Sigma区间 (数据分布接近正态)"
+            interval_method = "2 Sigma区间"
         else:
-            # 数据分布有偏，使用百分位区间
             recommended_lower = percentile_based_lower
             recommended_upper = percentile_based_upper
             interval_method = "百分位区间 (P5-P95)"
 
-        # 严格区间 (6sigma或P1-P99)
+        # 严格区间
         if metrics.get('within_6sigma', 0) > 99.9:
             strict_lower = metrics.get('sigma_6_lower', sigma_3_lower)
             strict_upper = metrics.get('sigma_6_upper', sigma_3_upper)
-            strict_method = "6 Sigma区间 (极高数据质量)"
+            strict_method = "6 Sigma区间"
         else:
             strict_lower = strict_percentile_lower
             strict_upper = strict_percentile_upper
@@ -177,16 +171,6 @@ class PerformanceAnalyzer:
         within_strict = sum(1 for x in data if strict_lower <= x <= strict_upper) / len(data) * 100
 
         interval_metrics.update({
-            'sigma_2_lower': sigma_2_lower,
-            'sigma_2_upper': sigma_2_upper,
-            'sigma_3_lower': sigma_3_lower,
-            'sigma_3_upper': sigma_3_upper,
-            'sigma_6_lower': metrics.get('sigma_6_lower', sigma_3_lower),
-            'sigma_6_upper': metrics.get('sigma_6_upper', sigma_3_upper),
-            'percentile_based_lower': percentile_based_lower,
-            'percentile_based_upper': percentile_based_upper,
-            'strict_percentile_lower': strict_percentile_lower,
-            'strict_percentile_upper': strict_percentile_upper,
             'recommended_lower': recommended_lower,
             'recommended_upper': recommended_upper,
             'strict_lower': strict_lower,
@@ -217,89 +201,75 @@ class PerformanceAnalyzer:
         return quality_metrics
 
     def generate_analysis_report(self, metrics: Dict[str, float], filename: str = "数据") -> str:
-        """生成分析报告 - 专注于单个文件的详细分析"""
-        result = "=" * 60 + "\n"
-        result += f"           {filename} 性能分析报告\n"
-        result += "=" * 60 + "\n"
+        """生成分析报告"""
+        result = "┌" + "─" * 58 + "┐\n"
+        result += f"│ {filename:^56} │\n"
+        result += "└" + "─" * 58 + "┘\n\n"
 
-        # 数据质量状态
+        # 数据概览
         data_count = metrics['count']
         data_quality = metrics.get('data_quality', '未知')
-        data_status = metrics.get('data_status', '')
 
-        result += f"样本数量: {data_count:.0f}  {data_quality}"
-        if data_status:
-            result += f" ({data_status})"
-        result += "\n\n"
+        result += f"数据概览: {data_count} 个样本 ({data_quality})\n"
+        result += "─" * 40 + "\n"
 
         # 数据量严重不足的情况
         if metrics.get('insufficient_data', False) and data_count < 10:
-            result += "数据量严重不足警告:\n"
-            result += "-" * 40 + "\n"
-            result += "  当前数据量无法进行有效的统计分析\n"
-            result += "  建议收集更多数据以获得可靠分析结果\n\n"
+            result += "\n⚠️  数据量严重不足\n"
+            result += "   当前数据量无法进行有效的统计分析\n"
+            result += "   建议收集更多数据以获得可靠分析结果\n\n"
 
             result += "基础统计 (仅供参考):\n"
-            result += "-" * 40 + "\n"
-            result += f"  平均值: {metrics['mean']:.2f}\n"
-            result += f"  中位数: {metrics['median']:.2f}\n"
-            result += f"  最小值: {metrics['min']:.2f}\n"
-            result += f"  最大值: {metrics['max']:.2f}\n\n"
+            result += f"   平均值: {metrics['mean']:.2f}\n"
+            result += f"   中位数: {metrics['median']:.2f}\n"
+            result += f"   最小值: {metrics['min']:.2f}\n"
+            result += f"   最大值: {metrics['max']:.2f}\n"
             return result
 
         # 数据量提示
         if metrics.get('insufficient_data', False):
-            result += "数据量较少，部分分析受限\n\n"
+            result += "⚠️  数据量较少，部分分析受限\n\n"
 
-        result += "基础统计:\n"
-        result += "-" * 40 + "\n"
-        result += f"  平均值 (Mean): {metrics['mean']:.2f}\n"
-        result += f"  中位数 (Median): {metrics['median']:.2f}\n"
-        result += f"  最小值: {metrics['min']:.2f}\n"
-        result += f"  最大值: {metrics['max']:.2f}\n"
+        # 基础统计
+        result += f"统计摘要:\n"
+        result += f"   平均值: {metrics['mean']:.2f}\n"
+        result += f"   中位数: {metrics['median']:.2f}\n"
+        result += f"   标准差: {metrics.get('std', 0):.2f}\n"
+        result += f"   范围: [{metrics['min']:.2f}, {metrics['max']:.2f}]\n\n"
 
         if 'std' in metrics:
-            result += f"  标准差 (Std): {metrics['std']:.2f}\n"
-            result += f"  方差: {metrics['variance']:.2f}\n\n"
-
+            # 百分位数 - 紧凑显示
             result += "百分位数:\n"
-            result += "-" * 40 + "\n"
-            if 'p1' in metrics:
-                result += f"  P1: {metrics['p1']:.2f}\n"
+            percentiles_display = []
             if 'p5' in metrics:
-                result += f"  P5: {metrics['p5']:.2f}\n"
-            if 'p10' in metrics:
-                result += f"  P10: {metrics['p10']:.2f}\n"
+                percentiles_display.append(f"P5: {metrics['p5']:.2f}")
             if 'p25' in metrics:
-                result += f"  P25: {metrics['p25']:.2f}\n"
-            result += f"  P50: {metrics['p50']:.2f}\n"
+                percentiles_display.append(f"P25: {metrics['p25']:.2f}")
+            percentiles_display.append(f"P50: {metrics['p50']:.2f}")
             if 'p75' in metrics:
-                result += f"  P75: {metrics['p75']:.2f}\n"
-            if 'p90' in metrics:
-                result += f"  P90: {metrics['p90']:.2f}\n"
-            result += f"  P95: {metrics['p95']:.2f}\n"
-            if 'p99' in metrics:
-                result += f"  P99: {metrics['p99']:.2f}\n\n"
+                percentiles_display.append(f"P75: {metrics['p75']:.2f}")
+            if 'p95' in metrics:
+                percentiles_display.append(f"P95: {metrics['p95']:.2f}")
+
+            # 每行显示3个百分位数
+            for i in range(0, len(percentiles_display), 3):
+                line = "   " + " | ".join(percentiles_display[i:i + 3])
+                result += line + "\n"
+            result += "\n"
 
             # 西格玛分析
             if 'sigma_3_lower' in metrics:
                 result += self._generate_sigma_analysis(metrics)
             elif 'sigma_status' in metrics:
-                result += "西格玛分析:\n"
-                result += "-" * 40 + "\n"
-                result += f"  {metrics['sigma_status']}，无法进行西格玛分析\n\n"
+                result += f"西格玛分析: {metrics['sigma_status']}\n\n"
 
             # 综合区间分析
             if 'recommended_lower' in metrics:
                 result += self._generate_interval_analysis(metrics)
             elif 'interval_status' in metrics:
-                result += "区间分析:\n"
-                result += "-" * 40 + "\n"
-                result += f"  {metrics['interval_status']}，无法进行综合区间分析\n\n"
+                result += f"区间分析: {metrics['interval_status']}\n\n"
         else:
-            result += "\n"
-            result += "数据量不足，无法计算标准差和百分位数\n"
-            result += "建议收集更多数据点以获得完整分析\n\n"
+            result += "数据量不足，无法计算扩展统计指标\n\n"
 
         # 数据收集建议
         result += self._generate_data_collection_advice(data_count)
@@ -308,91 +278,70 @@ class PerformanceAnalyzer:
 
     def _generate_sigma_analysis(self, metrics: Dict[str, float]) -> str:
         """生成西格玛分析报告"""
-        result = "西格玛范围分析:\n"
-        result += "-" * 40 + "\n"
+        result = "西格玛分析:\n"
 
-        # 使用安全的get方法，避免KeyError
         sigma_2_lower = metrics.get('sigma_2_lower')
         sigma_2_upper = metrics.get('sigma_2_upper')
         sigma_3_lower = metrics.get('sigma_3_lower')
         sigma_3_upper = metrics.get('sigma_3_upper')
-        sigma_6_lower = metrics.get('sigma_6_lower')
-        sigma_6_upper = metrics.get('sigma_6_upper')
 
         if sigma_2_lower is not None and sigma_2_upper is not None:
-            result += f"  2σ范围: [{sigma_2_lower:.2f}, {sigma_2_upper:.2f}]\n"
-            result += f"  数据在2σ范围内: {metrics.get('within_2sigma', 0):.2f}%\n"
+            result += f"   2σ: [{sigma_2_lower:.2f}, {sigma_2_upper:.2f}] "
+            result += f"({metrics.get('within_2sigma', 0):.1f}%)\n"
 
         if sigma_3_lower is not None and sigma_3_upper is not None:
-            result += f"  3σ范围: [{sigma_3_lower:.2f}, {sigma_3_upper:.2f}]\n"
-            result += f"  数据在3σ范围内: {metrics.get('within_3sigma', 0):.2f}%\n"
+            result += f"   3σ: [{sigma_3_lower:.2f}, {sigma_3_upper:.2f}] "
+            result += f"({metrics.get('within_3sigma', 0):.1f}%)\n"
 
-        # 6sigma分析
-        if sigma_6_lower is not None and sigma_6_upper is not None:
-            result += f"  6σ范围: [{sigma_6_lower:.2f}, {sigma_6_upper:.2f}]\n"
-            result += f"  数据在6σ范围内: {metrics.get('within_6sigma', 0):.2f}%\n\n"
-        else:
-            result += "\n"
-
+        result += "\n"
         return result
 
     def _generate_interval_analysis(self, metrics: Dict[str, float]) -> str:
         """生成综合区间分析报告"""
-        result = "综合区间分析:\n"
-        result += "-" * 40 + "\n"
-        result += f"  推荐区间: [{metrics.get('recommended_lower', 0):.2f}, {metrics.get('recommended_upper', 0):.2f}]\n"
-        result += f"  区间内数据比例: {metrics.get('within_recommended', 0):.2f}%\n"
-        result += f"  区间选择方法: {metrics.get('interval_method', 'N/A')}\n\n"
+        result = "推荐区间:\n"
 
-        result += "严格区间分析:\n"
-        result += "-" * 40 + "\n"
-        result += f"  严格区间: [{metrics.get('strict_lower', 0):.2f}, {metrics.get('strict_upper', 0):.2f}]\n"
-        result += f"  区间内数据比例: {metrics.get('within_strict', 0):.2f}%\n"
-        result += f"  区间选择方法: {metrics.get('strict_method', 'N/A')}\n\n"
-
-        # 区间选择建议
-        result += "区间选择建议:\n"
-        result += "-" * 40 + "\n"
+        recommended_lower = metrics.get('recommended_lower', 0)
+        recommended_upper = metrics.get('recommended_upper', 0)
         within_recommended = metrics.get('within_recommended', 0)
-        if within_recommended > 90:
-            result += "  [OK] 推荐区间覆盖了大部分数据，适合作为默认参考\n"
-        else:
-            result += "  [警告] 推荐区间覆盖数据较少，建议使用严格区间\n"
+        interval_method = metrics.get('interval_method', 'N/A')
 
-        within_3sigma = metrics.get('within_3sigma', 0)
-        if within_3sigma > 95:
-            result += "  [OK] 数据分布接近正态，Sigma区间是合理选择\n"
-        else:
-            result += "  [信息] 数据分布有偏，建议使用百分位区间\n"
+        result += f"   [{recommended_lower:.2f}, {recommended_upper:.2f}] "
+        result += f"({within_recommended:.1f}% 数据)\n"
+        result += f"   方法: {interval_method}\n\n"
 
-        within_6sigma = metrics.get('within_6sigma', 0)
-        if within_6sigma > 99.9:
-            result += "  [优秀] 数据质量极高，6Sigma区间可作为严格标准\n"
+        # 严格区间
+        strict_lower = metrics.get('strict_lower', 0)
+        strict_upper = metrics.get('strict_upper', 0)
+        within_strict = metrics.get('within_strict', 0)
+        strict_method = metrics.get('strict_method', 'N/A')
 
-        result += "\n"
+        result += "严格区间:\n"
+        result += f"   [{strict_lower:.2f}, {strict_upper:.2f}] "
+        result += f"({within_strict:.1f}% 数据)\n"
+        result += f"   方法: {strict_method}\n\n"
 
         return result
 
     def _generate_data_collection_advice(self, data_count: int) -> str:
         """生成数据收集建议"""
-        result = "数据收集建议:\n"
-        result += "-" * 40 + "\n"
+        result = "建议:\n"
+        result += "─" * 40 + "\n"
 
         if data_count < 10:
-            result += "  [警报] 立即停止分析，数据量严重不足\n"
-            result += "  → 建议收集至少10个数据点\n"
+            result += "⚠️  立即停止分析，数据量严重不足\n"
+            result += "   建议收集至少10个数据点\n"
         elif data_count < 30:
-            result += "  [警告] 数据量不足，只能进行基础分析\n"
-            result += "  → 建议收集至少30个数据点进行西格玛分析\n"
+            result += "⚠️  数据量不足，只能进行基础分析\n"
+            result += "   建议收集至少30个数据点进行西格玛分析\n"
         elif data_count < 100:
-            result += "  [信息] 数据量一般，可进行西格玛分析\n"
-            result += "  → 建议收集至少100个数据点进行综合区间分析\n"
+            result += "ℹ️  数据量一般，可进行西格玛分析\n"
+            result += "   建议收集至少100个数据点进行综合区间分析\n"
         elif data_count < 500:
-            result += "  [OK] 数据量足够进行完整分析\n"
-            result += "  → 当前数据质量良好\n"
+            result += "✅  数据量足够进行完整分析\n"
+            result += "   当前数据质量良好\n"
         else:
-            result += "  [优秀] 数据量充足，分析结果可靠\n"
-            result += "  → 当前数据质量优秀\n"
+            result += "✅  数据量充足，分析结果可靠\n"
+            result += "   当前数据质量优秀\n"
 
-        result += "\n"
         return result
+

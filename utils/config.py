@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 PROJECT_INFO = {
     'name': '性能分析工具',
-    'version': '1.0.0',
+    'version': '1.0.1',
     'description': '多文件性能数据分析工具'
 }
 

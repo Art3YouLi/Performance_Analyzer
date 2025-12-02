@@ -395,7 +395,7 @@ class PerformanceAnalyzerApp:
         self.result_text.config(state=DISABLED)
 
     def generate_comparison_report(self):
-        """生成多文件对比报告 - 纯文字简洁版本"""
+        """生成多文件对比报告 - 简化版本"""
         report = "=" * 70 + "\n"
         report += f"{'多文件性能分析报告':^70}\n"
         report += "=" * 70 + "\n\n"
@@ -468,17 +468,31 @@ class PerformanceAnalyzerApp:
         return report
 
     def plot_charts(self):
-        """绘制所有图表"""
-        for chart_type in CHART_TYPES:
-            if chart_type in self.chart_tabs:
-                if chart_type == "折线图":
-                    self.chart_renderer.plot_line_chart(self.file_datasets, self.chart_tabs[chart_type])
-                elif chart_type == "直方图":
-                    self.chart_renderer.plot_histogram(self.file_datasets, self.file_metrics,
-                                                       self.chart_tabs[chart_type])
-                elif chart_type == "箱线图":
-                    self.chart_renderer.plot_boxplot(self.file_datasets, self.file_metrics, self.chart_tabs[chart_type])
+        """绘制图表 - 根据文件数量决定绘制哪些图表"""
+        if len(self.file_datasets) > 1:
+            # 多文件模式：只绘制箱线图，其他图表显示提示信息
+            for chart_type in CHART_TYPES:
+                if chart_type in self.chart_tabs:
+                    if chart_type == "箱线图":
+                        self.chart_renderer.plot_boxplot(self.file_datasets, self.file_metrics,
+                                                         self.chart_tabs[chart_type])
+                    else:
+                        # 显示不支持多文件分析的提示
+                        self.chart_renderer.show_multi_file_message(self.chart_tabs[chart_type], chart_type)
+        else:
+            # 单文件模式：绘制所有三种图表
+            for chart_type in CHART_TYPES:
+                if chart_type in self.chart_tabs:
+                    if chart_type == "折线图":
+                        self.chart_renderer.plot_line_chart(self.file_datasets, self.chart_tabs[chart_type])
+                    elif chart_type == "直方图":
+                        self.chart_renderer.plot_histogram(self.file_datasets, self.file_metrics,
+                                                           self.chart_tabs[chart_type])
+                    elif chart_type == "箱线图":
+                        self.chart_renderer.plot_boxplot(self.file_datasets, self.file_metrics,
+                                                         self.chart_tabs[chart_type])
 
     def run(self):
         """运行应用"""
         self.root.mainloop()
+    

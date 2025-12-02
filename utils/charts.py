@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from typing import List, Dict
-from utils.config import FEISHU_COLORS, CHART_STYLE, FONT_CONFIG, SAFE_ICONS
+from utils.config import FEISHU_COLORS, CHART_STYLE, FONT_CONFIG
 
 
 class ChartRenderer:
@@ -53,202 +53,107 @@ class ChartRenderer:
         return fig, ax
 
     def plot_line_chart(self, file_datasets: Dict[str, List[float]], parent_frame):
-        """绘制折线图 - 优化美观度"""
+        """绘制折线图 - 仅用于单文件分析"""
         fig, ax = self.create_figure((8, 5.5))
 
-        # 优化的颜色列表
-        colors = [
-            '#3366CC', '#DC3912', '#FF9900', '#109618', '#990099',
-            '#0099C6', '#DD4477', '#66AA00', '#B82E2E', '#316395'
-        ]
+        # 单文件模式
+        filename, data = list(file_datasets.items())[0]
+        if len(data) == 0:
+            self._show_no_data_message(fig, ax, parent_frame)
+            return
 
-        if len(file_datasets) > 1:
-            # 多文件对比模式 - 优化样式
-            for i, (filename, file_data) in enumerate(file_datasets.items()):
-                if len(file_data) == 0:
-                    continue
+        time_points = np.arange(len(data))
+        short_name = filename.split('/')[-1]
 
-                time_points = np.arange(len(file_data))
-                color = colors[i % len(colors)]
-                short_name = filename.split('/')[-1]
-                label = f"{short_name} ({len(file_data)}点)"
+        # 主趋势线 - 优化样式
+        ax.plot(time_points, data, color=FEISHU_COLORS['primary'],
+                linewidth=2.5, alpha=0.9, marker='', markersize=0)
 
-                # 绘制主趋势线 - 优化线条样式
-                ax.plot(time_points, file_data, color=color, linewidth=2.0,
-                        alpha=0.85, label=label, marker='', markersize=0)
+        # 添加平滑趋势线
+        if len(data) > 20:
+            window_size = min(15, len(data) // 10)
+            kernel = np.ones(window_size) / window_size
+            smoothed = np.convolve(data, kernel, mode='valid')
 
-                # 为数据量大的文件添加平滑曲线
-                if len(file_data) > 50:
-                    # 使用移动平均创建平滑曲线
-                    window_size = min(10, len(file_data) // 20)
-                    if window_size > 1:
-                        kernel = np.ones(window_size) / window_size
-                        smoothed = np.convolve(file_data, kernel, mode='valid')
-                        ax.plot(time_points[window_size - 1:], smoothed,
-                                color=color, linewidth=2.5, linestyle='-',
-                                alpha=0.7, label=f'{short_name} - 平滑')
+            ax.plot(time_points[window_size - 1:], smoothed,
+                    color=FEISHU_COLORS['danger'], linewidth=3.0,
+                    label='平滑趋势线', alpha=0.8)
 
-            # 优化图例
             ax.legend(frameon=True, framealpha=0.95, edgecolor=FEISHU_COLORS['info'],
-                      loc='upper left', bbox_to_anchor=(1.02, 1),
-                      borderaxespad=0., facecolor=FEISHU_COLORS['card'])
-
-            title = f'趋势图 - 多文件数据对比 ({len(file_datasets)}个文件)'
-        else:
-            # 单文件模式 - 优化样式
-            filename, data = list(file_datasets.items())[0]
-            if len(data) == 0:
-                self._show_no_data_message(fig, ax, parent_frame)
-                return
-
-            time_points = np.arange(len(data))
-            short_name = filename.split('/')[-1]
-
-            # 主趋势线 - 优化样式
-            ax.plot(time_points, data, color=FEISHU_COLORS['primary'],
-                    linewidth=2.5, alpha=0.9, marker='', markersize=0)
-
-            # 添加平滑趋势线
-            if len(data) > 20:
-                window_size = min(15, len(data) // 10)
-                kernel = np.ones(window_size) / window_size
-                smoothed = np.convolve(data, kernel, mode='valid')
-
-                ax.plot(time_points[window_size - 1:], smoothed,
-                        color=FEISHU_COLORS['danger'], linewidth=3.0,
-                        label='平滑趋势线', alpha=0.8)
-
-                ax.legend(frameon=True, framealpha=0.95, edgecolor=FEISHU_COLORS['info'],
-                          facecolor=FEISHU_COLORS['card'])
-
-            title = f'{short_name} - 数据趋势分析'
+                      facecolor=FEISHU_COLORS['card'])
 
         # 优化坐标轴标签
         ax.set_xlabel('样本序列', fontweight='600', color=FEISHU_COLORS['text_primary'])
         ax.set_ylabel('数值', fontweight='600', color=FEISHU_COLORS['text_primary'])
 
         # 优化标题
-        ax.set_title(title, fontsize=FONT_CONFIG['title_size'],
+        ax.set_title(f'{short_name} - 数据趋势分析', fontsize=FONT_CONFIG['title_size'],
                      fontweight='700', color=FEISHU_COLORS['text_primary'], pad=20)
 
         # 优化网格
         ax.grid(True, alpha=0.6, linestyle='--', linewidth=0.8)
 
-        # 调整布局
-        if len(file_datasets) > 1:
-            plt.tight_layout(rect=[0, 0, 0.85, 1])
-        else:
-            plt.tight_layout()
-
+        plt.tight_layout()
         self._embed_chart(fig, parent_frame)
 
     def plot_histogram(self, file_datasets: Dict[str, List[float]], file_metrics: Dict[str, Dict], parent_frame):
-        """绘制直方图 - 优化美观度"""
+        """绘制直方图 - 仅用于单文件分析"""
         fig, ax = self.create_figure((8, 5.5))
 
-        # 优化的颜色列表
-        colors = [
-            '#3366CC', '#DC3912', '#FF9900', '#109618', '#990099',
-            '#0099C6', '#DD4477', '#66AA00', '#B82E2E', '#316395'
-        ]
+        # 单文件模式
+        filename, data = list(file_datasets.items())[0]
+        if len(data) == 0:
+            self._show_no_data_message(fig, ax, parent_frame)
+            return
 
-        if len(file_datasets) > 1:
-            # 多文件对比模式 - 优化样式
-            all_data = []
-            for file_data in file_datasets.values():
-                all_data.extend(file_data)
+        metrics = file_metrics[filename]
+        short_name = filename.split('/')[-1]
 
-            if len(all_data) == 0:
-                self._show_no_data_message(fig, ax, parent_frame)
-                return
+        # 计算优化的bins
+        bins = min(20, max(10, len(data) // 20))
 
-            # 计算优化的bins
-            bins = np.histogram_bin_edges(all_data, bins=min(25, len(all_data) // 15))
+        # 绘制直方图 - 优化样式
+        n, bins, patches = ax.hist(data, bins=bins, alpha=0.85,
+                                   color=FEISHU_COLORS['primary'],
+                                   edgecolor='white', linewidth=1.5)
 
-            for i, (filename, file_data) in enumerate(file_datasets.items()):
-                if len(file_data) == 0:
-                    continue
+        # 标记关键指标
+        if 'insufficient_data' not in metrics:
+            # 平均值线
+            ax.axvline(metrics['mean'], color=FEISHU_COLORS['primary'],
+                       linestyle='-', alpha=0.9, linewidth=3,
+                       label=f"平均值: {metrics['mean']:.2f}")
 
-                color = colors[i % len(colors)]
-                short_name = filename.split('/')[-1]
+            # 中位数线
+            ax.axvline(metrics['median'], color=FEISHU_COLORS['success'],
+                       linestyle='--', alpha=0.9, linewidth=2.5,
+                       label=f"中位数: {metrics['median']:.2f}")
 
-                # 绘制直方图 - 优化样式
-                n, bins, patches = ax.hist(file_data, bins=bins, alpha=0.7, color=color,
-                                           edgecolor='white', linewidth=1.2, label=short_name)
+            # 添加西格玛范围背景
+            if 'sigma_3_lower' in metrics and 'sigma_3_upper' in metrics:
+                ax.axvspan(metrics['sigma_3_lower'], metrics['sigma_3_upper'],
+                           alpha=0.15, color=FEISHU_COLORS['info'],
+                           label='3σ范围')
 
-            # 优化图例
-            ax.legend(frameon=True, framealpha=0.95, edgecolor=FEISHU_COLORS['info'],
-                      loc='upper left', bbox_to_anchor=(1.02, 1),
-                      borderaxespad=0., facecolor=FEISHU_COLORS['card'])
-
-            title = f'分布图 - 多文件数据对比 ({len(file_datasets)}个文件)'
-        else:
-            # 单文件模式 - 优化样式
-            filename, data = list(file_datasets.items())[0]
-            if len(data) == 0:
-                self._show_no_data_message(fig, ax, parent_frame)
-                return
-
-            metrics = file_metrics[filename]
-            short_name = filename.split('/')[-1]
-
-            # 计算优化的bins
-            bins = min(20, max(10, len(data) // 20))
-
-            # 绘制直方图 - 优化样式
-            n, bins, patches = ax.hist(data, bins=bins, alpha=0.85,
-                                       color=FEISHU_COLORS['primary'],
-                                       edgecolor='white', linewidth=1.5)
-
-            # 标记关键指标 - 优化样式
-            if 'insufficient_data' not in metrics:
-                # 平均值线
-                ax.axvline(metrics['mean'], color=FEISHU_COLORS['primary'],
-                           linestyle='-', alpha=0.9, linewidth=3,
-                           label=f"平均值: {metrics['mean']:.2f}")
-
-                # 中位数线
-                ax.axvline(metrics['p50'], color=FEISHU_COLORS['success'],
-                           linestyle='--', alpha=0.9, linewidth=2.5,
-                           label=f"中位数: {metrics['p50']:.2f}")
-
-                # P95线
-                ax.axvline(metrics['p95'], color=FEISHU_COLORS['warning'],
-                           linestyle='-.', alpha=0.9, linewidth=2,
-                           label=f"P95: {metrics['p95']:.2f}")
-
-                # 添加西格玛范围背景
-                if 'sigma_3_lower' in metrics:
-                    ax.axvspan(metrics['sigma_3_lower'], metrics['sigma_3_upper'],
-                               alpha=0.15, color=FEISHU_COLORS['info'],
-                               label='3σ范围')
-
-            ax.legend(frameon=True, framealpha=0.95, edgecolor=FEISHU_COLORS['info'],
-                      facecolor=FEISHU_COLORS['card'])
-
-            title = f'{short_name} - 数据分布分析'
+        ax.legend(frameon=True, framealpha=0.95, edgecolor=FEISHU_COLORS['info'],
+                  facecolor=FEISHU_COLORS['card'])
 
         # 优化坐标轴标签
         ax.set_xlabel('数值', fontweight='600', color=FEISHU_COLORS['text_primary'])
         ax.set_ylabel('频数', fontweight='600', color=FEISHU_COLORS['text_primary'])
 
         # 优化标题
-        ax.set_title(title, fontsize=FONT_CONFIG['title_size'],
+        ax.set_title(f'{short_name} - 数据分布直方图', fontsize=FONT_CONFIG['title_size'],
                      fontweight='700', color=FEISHU_COLORS['text_primary'], pad=20)
 
         # 优化网格
         ax.grid(True, alpha=0.6, linestyle='--', linewidth=0.8)
 
-        # 调整布局
-        if len(file_datasets) > 1:
-            plt.tight_layout(rect=[0, 0, 0.85, 1])
-        else:
-            plt.tight_layout()
-
+        plt.tight_layout()
         self._embed_chart(fig, parent_frame)
 
     def plot_boxplot(self, file_datasets: Dict[str, List[float]], file_metrics: Dict[str, Dict], parent_frame):
-        """绘制箱线图 - 优化美观度"""
+        """绘制箱线图 - 支持单文件和多文件"""
         fig, ax = self.create_figure((8, 5.5))
 
         # 过滤掉空数据集
@@ -277,12 +182,12 @@ class ChartRenderer:
                                   medianprops=dict(color=FEISHU_COLORS['danger'], linewidth=2.5),
                                   flierprops=dict(marker='o', markersize=4, alpha=0.6, markerfacecolor='red'))
 
-            # 设置箱体颜色 - 优化颜色
+            # 设置箱体颜色
             for i, box in enumerate(box_plot['boxes']):
                 box.set_facecolor(colors[i % len(colors)])
                 box.set_edgecolor(colors[i % len(colors)])
 
-            title = f'箱线图 - 多文件数据对比 ({len(valid_datasets)}个文件)'
+            title = f'多文件数据对比箱线图 ({len(valid_datasets)}个文件)'
         else:
             # 单文件模式 - 优化样式
             filename, data = list(valid_datasets.items())[0]
@@ -300,18 +205,17 @@ class ChartRenderer:
             box_plot['boxes'][0].set_facecolor(FEISHU_COLORS['primary'])
             box_plot['boxes'][0].set_edgecolor(FEISHU_COLORS['primary'])
 
-            # 添加统计标注 - 优化样式
-            stats_text = f'''统计摘要:
-平均值: {metrics['mean']:.2f}
-中位数: {metrics['p50']:.2f}
-Q1: {metrics.get('p25', metrics['p50']):.2f}
-Q3: {metrics.get('p75', metrics['p50']):.2f}
-P95: {metrics['p95']:.2f}'''
+            # 添加统计标注
+            if 'insufficient_data' not in metrics:
+                stats_text = f'''统计摘要:
+中位数: {metrics['median']:.2f}
+标准差: {metrics.get('std', 0):.2f}
+数据范围: [{metrics['min']:.2f}, {metrics['max']:.2f}]'''
 
-            # 在图表右侧添加文本
-            ax.text(1.35, 0.5, stats_text, transform=ax.transAxes, fontsize=10,
-                    verticalalignment='center', bbox=dict(boxstyle="round,pad=0.5",
-                                                          facecolor=FEISHU_COLORS['background'], alpha=0.8))
+                # 在图表右侧添加文本
+                ax.text(1.35, 0.5, stats_text, transform=ax.transAxes, fontsize=10,
+                        verticalalignment='center', bbox=dict(boxstyle="round,pad=0.5",
+                                                              facecolor=FEISHU_COLORS['background'], alpha=0.8))
 
             title = f'{short_name} - 数据分布箱线图'
 
@@ -331,8 +235,28 @@ P95: {metrics['p95']:.2f}'''
         plt.tight_layout()
         self._embed_chart(fig, parent_frame)
 
+    def show_multi_file_message(self, parent_frame, chart_type: str):
+        """显示多文件模式下不支持该图表类型的消息"""
+        fig, ax = self.create_figure((8, 5.5))
+
+        message = f'{chart_type}仅支持单文件分析\n\n'
+        message += '当前已加载多个文件，\n'
+        message += '请切换到"箱线图"标签页查看多文件对比'
+
+        ax.text(0.5, 0.5, message,
+                horizontalalignment='center', verticalalignment='center',
+                transform=ax.transAxes, fontsize=14, color=FEISHU_COLORS['text_primary'],
+                fontweight='600')
+
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+
+        self._embed_chart(fig, parent_frame)
+
     def _show_no_data_message(self, fig, ax, parent_frame):
-        """显示无数据消息 - 优化样式"""
+        """显示无数据消息"""
         ax.text(0.5, 0.5, '无有效数据可显示',
                 horizontalalignment='center', verticalalignment='center',
                 transform=ax.transAxes, fontsize=16, color=FEISHU_COLORS['text_secondary'],
@@ -347,16 +271,16 @@ P95: {metrics['p95']:.2f}'''
         self._embed_chart(fig, parent_frame)
 
     def _embed_chart(self, fig, parent_frame):
-        """将图表嵌入到GUI - 优化嵌入方式"""
+        """将图表嵌入到GUI"""
         for widget in parent_frame.winfo_children():
             widget.destroy()
 
         canvas = FigureCanvasTkAgg(fig, parent_frame)
         canvas.draw()
 
-        # 使用grid布局并设置权重，确保图表能够扩展和收缩
+        # 使用grid布局并设置权重
         canvas.get_tk_widget().grid(row=0, column=0, sticky='nsew')
 
-        # 设置父容器的行列权重，确保图表能够正确扩展
+        # 设置父容器的行列权重
         parent_frame.columnconfigure(0, weight=1)
         parent_frame.rowconfigure(0, weight=1)

@@ -109,7 +109,7 @@ class PerformanceAnalyzer:
     def generate_analysis_report(self, metrics: Dict[str, float], filename: str = "数据") -> str:
         """生成分析报告 - 简化版本"""
         result = "┌" + "─" * 58 + "┐\n"
-        result += f"│ {filename:^56} │\n"
+        result += f" {filename:^56} \n"
         result += "└" + "─" * 58 + "┘\n\n"
 
         # 数据概览
